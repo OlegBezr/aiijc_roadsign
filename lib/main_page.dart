@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'dart:math';
 
+import 'package:aiijc_roadsign/api.dart';
+import 'package:aiijc_roadsign/image_data.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -10,33 +10,20 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  final _picker = ImagePicker();
-  File _pickedImageFile;
+  TextEditingController _textController = TextEditingController();
+  ImageData _imageData;
   var _chosenClass = 'Turn';
   final _valueClasses = ['Speedlimit', 'City'];
   var _chosenValue = '';
 
-  Future _pickImage() async {
-    // if (_pickedImageFile == null) {
-    //   var pickedImage = await _picker.getImage(source: ImageSource.gallery);
+  Future getImage() async {
+    if (_imageData == null) {
+      var image = await Api.getImage();
 
-    //   if (pickedImage == null) {
-    //     _pickImage();
-    //     return;
-    //   }
-
-    //   var imageFile = File(pickedImage.path);
-
-    //   setState(() {
-    //     _pickedImageFile = imageFile;
-    //   });
-    // }
-  }
-
-  @override
-  void initState() {
-    _pickImage();
-    super.initState();
+      setState(() {
+        _imageData = image;
+      });
+    }
   }
 
   @override
@@ -48,13 +35,21 @@ class _MainPageState extends State<MainPage> {
         centerTitle: true,
       ),
       body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
+        behavior: HitTestBehavior.opaque,
         onTap: () {
-          FocusScope.of(context).unfocus();
+          // if (FocusScope.of(context).hasFocus)
+          //   FocusScope.of(context).unfocus();
         },
-        child: Builder(
-          builder: (context) {
-            if (_pickedImageFile == null) {
+        child: FutureBuilder(
+          future: getImage(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              if (_imageData == null) {
+                return Container(color: Colors.redAccent);
+              }
+
+              _textController.text = _chosenValue;
+
               return Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                 child: SingleChildScrollView(
@@ -73,10 +68,10 @@ class _MainPageState extends State<MainPage> {
                               
                             ),
                             color: Colors.black,
-                            // image: DecorationImage(
-                            //   image: FileImage(_pickedImageFile),
-                            //   fit: BoxFit.contain
-                            // )
+                            image: DecorationImage(
+                              image: NetworkImage(_imageData.url),
+                              fit: BoxFit.contain
+                            )
                           ),
                         ),
                         SizedBox(height: 20),
@@ -101,6 +96,7 @@ class _MainPageState extends State<MainPage> {
                               onChanged: (value) {
                                 setState(() {
                                   _chosenClass = value;
+                                  _chosenValue = '';
                                 });
                               },
                             ),
@@ -120,7 +116,9 @@ class _MainPageState extends State<MainPage> {
                               ),
                               child: Center(
                                 child: TextField(
-                                  onChanged: (value) {
+                                  controller: _textController,
+                                  onSubmitted: (value) {
+                                    print(value);
                                     setState(() {
                                       _chosenValue = value;
                                     });
@@ -147,8 +145,12 @@ class _MainPageState extends State<MainPage> {
                             side: BorderSide()
                           ),
                           onPressed: (_chosenClass != 'None' && !(_valueClasses.contains(_chosenClass) && _chosenValue == ''))? () {
-                            _pickedImageFile = null;
-                            _pickImage();
+                            var submission = SubmissionImageData(_imageData.name, _imageData.apiKey, _chosenClass + '_' + _chosenValue, true);
+                            Api.submitImage(submission);
+
+                            // setState(() {
+                            //   _imageData = null;
+                            // });
                           }: null
                         ),
                         SizedBox(height: 10),
@@ -156,7 +158,7 @@ class _MainPageState extends State<MainPage> {
                           minWidth: min(200, MediaQuery.of(context).size.width / 3),
                           height: 50,
                           child: Text(
-                            'Skip',
+                            'Delete',
                             style: TextStyle(
                               color: Colors.red,
                               fontSize: 20
@@ -164,8 +166,12 @@ class _MainPageState extends State<MainPage> {
                           ),
                           disabledColor: Colors.grey,
                           onPressed: () {
-                            _pickedImageFile = null;
-                            _pickImage();
+                            var submission = SubmissionImageData(_imageData.name, _imageData.apiKey, _chosenClass, false);
+                            Api.submitImage(submission);
+
+                            // setState(() {
+                            //   _imageData = null;
+                            // });
                           }
                         ),
                       ],
